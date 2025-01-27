@@ -19,7 +19,7 @@ func (ci *ChannelIterator[T]) GetValuesWithChannel(ctx context.Context) <-chan T
 		defer close(ch)
 		defer fmt.Println("Producer fully stopped")
 
-		for i := 0; i < len(ci.Data); i++ { // Producer will stop after 10 iterations
+		for i := 0; i < len(ci.Data); i++ { // Producer will stop after iterate all data elements
 			select {
 			case <-ctx.Done(): // To have control over the completion
 				fmt.Println("Producer received cancel signal")
