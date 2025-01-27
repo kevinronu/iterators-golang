@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"context"
 	"fmt"
+	"iter"
 	"time"
 )
 
@@ -11,7 +12,7 @@ type ChannelIterator[T cmp.Ordered] struct {
 	Data []T
 }
 
-func (ci *ChannelIterator[T]) GetValues(ctx context.Context) <-chan T {
+func (ci *ChannelIterator[T]) GetValuesWithChannel(ctx context.Context) <-chan T {
 	ch := make(chan T)
 
 	go func() {
@@ -47,7 +48,7 @@ func (ci *ChannelIterator[T]) GetValues(ctx context.Context) <-chan T {
 }
 
 func IterateWithChannelWithCancel[T cmp.Ordered](ctx context.Context, ci *ChannelIterator[T]) {
-	ch := ci.GetValues(ctx)
+	ch := ci.GetValuesWithChannel(ctx)
 
 	var zero T
 
@@ -59,11 +60,11 @@ func IterateWithChannelWithCancel[T cmp.Ordered](ctx context.Context, ci *Channe
 	}
 
 	fmt.Println("Receiver stopped, but producer continues working...")
-	time.Sleep(3 * time.Second) // Observe producer activity
+	time.Sleep(2 * time.Second) // Observe producer activity
 }
 
 func IterateWithChannelWithoutCancel[T cmp.Ordered](ctx context.Context, cancelFunc context.CancelFunc, ci *ChannelIterator[T]) {
-	ch := ci.GetValues(ctx)
+	ch := ci.GetValuesWithChannel(ctx)
 
 	var zero T
 
@@ -76,7 +77,19 @@ func IterateWithChannelWithoutCancel[T cmp.Ordered](ctx context.Context, cancelF
 	}
 
 	fmt.Println("Receiver and producer stopped.")
-	time.Sleep(3 * time.Second) // Observe no producer activity
+	time.Sleep(2 * time.Second) // Observe no producer activity
+}
+
+func (ci *ChannelIterator[T]) GetValuesWithIterator() iter.Seq[T] {
+	return func(yield func(T) bool) { // yield is only a name, this can be named callback
+		for i := 0; i < len(ci.Data); i++ {
+			fmt.Println("Produced:", ci.Data[i])
+			keepGoing := yield(ci.Data[i])
+			if !keepGoing {
+				return
+			}
+		}
+	}
 }
 
 func main() {
@@ -84,10 +97,18 @@ func main() {
 		Data: []int{-1, 0, 1},
 	}
 
-	fmt.Println("Example without cancel:")
-	IterateWithChannelWithCancel(context.Background(), ci) // No cancellation context
+	// fmt.Println("Example without cancel:")
+	// IterateWithChannelWithCancel(context.Background(), ci) // No cancellation context
 
-	fmt.Println("\nExample with cancel:")
-	ctx, cancel := context.WithCancel(context.Background())
-	IterateWithChannelWithoutCancel(ctx, cancel, ci)
+	// fmt.Println("\nExample with cancel:")
+	// ctx, cancel := context.WithCancel(context.Background())
+	// IterateWithChannelWithoutCancel(ctx, cancel, ci)
+
+	fmt.Println("\nExample with iterators:")
+	for value := range ci.GetValuesWithIterator() {
+		fmt.Println("Consumed:", value)
+		if value == 0 {
+			break
+		}
+	}
 }
